@@ -1,0 +1,20 @@
+- name: Set vm.max_map_count
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: true
+
+- name: Set the hard file fd limit to 1000000
+  community.general.pam_limits:
+    domain: '*'
+    limit_type: hard
+    limit_item: nofile
+    value: 1000000
+
+- name: Set the soft file fd limit to 1000000
+  community.general.pam_limits:
+    domain: '*'
+    limit_type: soft
+    limit_item: nofile
+    value: 1000000

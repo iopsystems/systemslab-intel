@@ -1,0 +1,32 @@
+# AWS i3en has two local SSDs. We format the SSDs, mount them to /mnt/localssd-1
+- name: Find first local SSD
+  shell: for nvme in `ls -d /sys/block/nvme* | xargs -n 1 basename`; do if grep -q "Amazon EC2 NVMe Instance Storage" /sys/block/$nvme/device/model; then echo /dev/$nvme; break; fi; done
+  register: localssd
+
+- name: Format disks
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ item }}"
+  with_items:
+    - "{{ localssd.stdout }}"
+  when: localssd.stdout != ""
+
+- name: Mount disks
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "{{ item.src }}"
+    fstype: ext4
+    opts: defaults,noatime,nodiscard,nodelalloc
+    state: mounted
+  with_items:
+    - { path: "/mnt/localssd-1", src: "{{ localssd.stdout }}" }
+  when: localssd.stdout != ""
+
+- name: Update /mnt/localssd-1
+  ansible.builtin.file:
+    path: /mnt/localssd-1
+    owner: root
+    group: ubuntu
+    mode: "0775"
+    state: directory
+  when: localssd.stdout != ""

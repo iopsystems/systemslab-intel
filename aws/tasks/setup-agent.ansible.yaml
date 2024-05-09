@@ -1,0 +1,94 @@
+- name: Install gpg
+  ansible.builtin.apt:
+    name: gpg
+
+- name: Create the GCP keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/gcp
+    state: directory
+    mode: "0775"
+
+- name: Download the GCP package key
+  ansible.builtin.get_url:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    dest: /etc/apt/keyrings/gcp/apt-key.asc
+    checksum: sha256:aa26cfdf2640ea1e02e8959b77957491cf5fb78964f06a5921e2c79607872797
+    mode: "0644"
+
+- name: Dearmor the GCP package key
+  ansible.builtin.shell:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/gcp/apt-key.gpg < /etc/apt/keyrings/gcp/apt-key.asc
+    creates: /etc/apt/keyrings/gcp/apt-key.gpg
+
+- name: Download package key for the systemslab repository
+  ansible.builtin.get_url:
+    url: https://us-apt.pkg.dev/doc/repo-signing-key.gpg
+    dest: /etc/apt/keyrings/gcp/repo-signing-key.asc
+    checksum: sha256:3ce6a27fe0538464191eebb9ff1a0b8a269af16d872524822b25198328263e84
+    mode: "0644"
+
+- name: Dearmor the systemslab package key
+  ansible.builtin.shell:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/gcp/repo-signing-key.gpg < /etc/apt/keyrings/gcp/repo-signing-key.asc
+    creates: /etc/apt/keyrings/gcp/repo-signing-key.gpg
+
+- name: Copy the GCP credentials to the host
+  ansible.builtin.copy:
+    src: "~/.aws/systemslab-gcp-creds.json"
+    dest: /etc/apt/keyrings/gcp/credentials.json
+    mode: "0600"
+
+- name: Setup the apt-transport-artifact-registry repository (x86 and amd64)
+  when: ansible_architecture == "x86_64" or ansible_architecture == "x86"
+  ansible.builtin.apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/gcp/apt-key.gpg] http://packages.cloud.google.com/apt apt-transport-artifact-registry-stable main
+    filename: gcp-artifact-registry
+
+- name: Setup the apt-transport-artifact-registry repository (arm64)
+  when: not (ansible_architecture == "amd64" or ansible_architecture == "x86")
+  ansible.builtin.apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/gcp/apt-key.gpg] http://packages.cloud.google.com/apt apt-transport-artifact-registry-unstable main
+    filename: gcp-artifact-registry
+
+- name: Install apt-transport-artifact-registry
+  ansible.builtin.apt:
+    name: apt-transport-artifact-registry
+    state: present
+    update_cache: true
+
+- name: Override artifact-registry Service-Account-JSON
+  ansible.builtin.copy:
+    content: |
+      Acquire::gar {
+        Service-Account-JSON "/etc/apt/keyrings/gcp/credentials.json";
+      }
+    dest: /etc/apt/apt.conf.d/90artifact-registry
+    mode: "0644"
+
+- name: Setup the systemslab APT repo
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/gcp/repo-signing-key.asc] ar+https://us-apt.pkg.dev/projects/systemslab {{ ansible_distribution_release }} main"
+    filename: systemslab
+
+- name: Create the agent config directory
+  ansible.builtin.file:
+    path: /etc/systemslab
+    state: directory
+    mode: "0775"
+
+- name: Create the systemslab-agent config file
+  ansible.builtin.copy:
+    content: "{{ agent_config }}"
+    dest: /etc/systemslab/agent.toml
+    mode: "0644"
+
+- name: Install systemslab-agent
+  ansible.builtin.apt:
+    name: systemslab-agent
+    allow_downgrade: true
+    state: latest
+    update_cache: true
+
+- name: Install rpc-perf
+  ansible.builtin.apt:
+    name: rpc-perf

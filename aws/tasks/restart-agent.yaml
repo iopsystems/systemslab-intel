@@ -1,0 +1,10 @@
+- name: Restart Systemslab Agent Service
+  hosts: agent
+  become: true
+  become_user: root
+  become_method: ansible.builtin.sudo
+  tasks:
+    - name: Restart Systemslab Agent
+      ansible.builtin.service:
+        name: systemslab-agent
+        state: restarted

@@ -1,0 +1,46 @@
+- name: Add systemslab-agent to the sudo list
+  ansible.builtin.user:
+    name: systemslab-agent
+    group: ubuntu
+    groups: ["sudo", "ubuntu"]
+    shell: /bin/bash
+    create_home: true
+    home: /home/systemslab-agent
+    append: true
+
+- name: Grant systemslab-agent passwordless sudo
+  community.general.sudoers:
+    name: systemslab-agent-sudo
+    state: present
+    user: systemslab-agent
+    nopassword: true
+    commands: ALL
+
+- name: Create ssh directory at /home/systemslab-agent/.ssh
+  ansible.builtin.file:
+    path: /home/systemslab-agent/.ssh
+    state: directory
+    owner: systemslab-agent
+    mode: '0700'
+
+- name: Copy private key to systemslab home directory
+  ansible.builtin.copy:
+    src: ~/.aws/systemslab_aws_key
+    dest: /home/systemslab-agent/.ssh/id_rsa
+    owner: systemslab-agent
+    mode: '0600'
+  when: lookup('ansible.builtin.fileglob', '/home/ubuntu/.aws/systemslab_aws_key') != []
+
+- name: Copy public key to systemslab home directory
+  ansible.builtin.copy:
+    src: ~/.aws/systemslab_aws_key.pub
+    dest: /home/systemslab-agent/.ssh/id_rsa.pub
+    owner: systemslab-agent
+    mode: '0644'
+  when: lookup('ansible.builtin.fileglob', '/home/ubuntu/.aws/systemslab_aws_key.pub') != []
+
+- name: Set systemslab-agent authorized key taken from file
+  ansible.posix.authorized_key:
+    user: systemslab-agent
+    state: present
+    key: "{{ lookup('file', '~/.aws/systemslab_aws_key.pub') }}"

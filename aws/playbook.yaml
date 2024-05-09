@@ -1,0 +1,69 @@
+- name: Set up hosts for kafka tests
+  hosts: kafka
+  become: true
+  become_user: root
+  become_method: ansible.builtin.sudo
+  tasks:
+    - name: Do kafka setup
+      ansible.builtin.import_tasks:
+        file: tasks/kafka.ansible.yaml
+
+# This should go last because once it completes the agent is available to run experiments.
+- name: Set up a SystemsLab Agent
+  hosts: "agent"
+  become: true
+  become_user: root
+  become_method: ansible.builtin.sudo
+  tasks:
+    - name: Install some packages
+      ansible.builtin.apt:
+        name:
+          - emacs
+          - build-essential
+          - htop
+          - openjdk-21-jdk
+          - libevent-dev
+          - cmake
+          - linux-tools-6.2.0-1012-aws
+          - wrk
+          - acl 
+          - numactl       
+        update_cache: true
+
+    - name: Configure system limits
+      ansible.builtin.import_tasks:
+        file: tasks/limits.ansible.yaml
+
+    - name: Install and set up systemslab-agent
+      ansible.builtin.import_tasks:
+        file: tasks/setup-agent.ansible.yaml
+      notify:
+        - Enable and restart systemslab agent
+
+    - name: Grant systemslab-agent passwordless sudo
+      ansible.builtin.import_tasks:
+        file: tasks/sudo.ansible.yaml
+      notify:
+        - Enable and restart systemslab agent
+    
+    - name: Find, format, and mount the first local SSD
+      ansible.builtin.import_tasks:
+        file: tasks/localssd.yaml
+
+  handlers:
+    - name: Enable and restart systemslab agent
+      ansible.builtin.service:
+        name: systemslab-agent
+        enabled: true
+        masked: false
+        state: restarted
+
+- name: Set up the auto-shutdown for an agent host
+  hosts: autoshutdown
+  become: true
+  become_user: root
+  become_method: ansible.builtin.sudo
+  tasks:
+    - name: Set up the autoshutdown task
+      ansible.builtin.import_tasks:
+        file: tasks/autoshutdown.ansible.yaml

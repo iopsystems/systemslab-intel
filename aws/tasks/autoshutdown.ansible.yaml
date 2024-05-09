@@ -1,0 +1,20 @@
+- name: Install some packages
+  ansible.builtin.apt:
+    name:
+      - jq
+      - curl
+    update_cache: true
+
+- name: Install auto-shutdown script
+  ansible.builtin.copy:
+    src: "../autoshutdown.sh"
+    dest: /usr/local/bin/autoshutdown.sh
+    mode: "0755"
+
+- name: Enable the cronjob for the script
+  ansible.builtin.cron:
+    name: autoshutdown
+    minute: "*/10"
+    job: /usr/local/bin/autoshutdown.sh
+    user: root
+  become: true

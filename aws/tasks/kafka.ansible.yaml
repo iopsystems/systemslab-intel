@@ -1,0 +1,36 @@
+- name: Install multiple OpenJDK for testing
+  ansible.builtin.apt:
+    name:
+      - openjdk-8-jdk
+      - openjdk-11-jdk
+      - openjdk-17-jdk
+      - openjdk-21-jdk
+      - maven
+    update_cache: true
+
+- name: Using openjdk-21-jdk as the default OpenJDK
+  community.general.alternatives:
+    name: java
+    path: /usr/lib/jvm/java-21-openjdk-amd64/bin/java
+
+- set_fact:
+    kafka_package_name: kafka_2.13-3.6.1.tgz
+    kafka_package_download_path: /tmp
+    kafka_package_installation_path: /opt
+
+- name: check kafka package
+  stat: path=/tmp/{{ kafka_package_name }}
+  register: kafka_package_exists
+
+- name: download kafka tar if not downloaded
+  get_url: url=https://archive.apache.org/dist/kafka/3.6.1/kafka_2.13-3.6.1.tgz dest={{ kafka_package_download_path }}
+  when: not kafka_package_exists.stat.exists 
+
+- name: unarchive kafka package
+  unarchive:
+    src: "{{ kafka_package_download_path }}/{{ kafka_package_name }}"
+    dest: "{{ kafka_package_installation_path }}"
+    copy: no
+    owner: root
+    group: ubuntu
+    mode: 0775
