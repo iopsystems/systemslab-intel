@@ -4,156 +4,46 @@
 # See the comments in agents_expanded to see what they do.
 locals {
   agents = [
-    # Some example ones, don't actually use these
+    # Kafka Gen 4 Vs. Gen 3
+    # two m7i.2xlarge client
     {
-      type  = "t2.micro"
-      count = 0
-    },
-    {
-      type     = "t2.micro"
-      basename = "spot-t2-micro"
-      count    = 0
-      spot     = true
-      autoshutdown = false
-    },
-
-    # The following are copied from aws/queues
-    {
-      type  = "c7i.2xlarge"
-      count = 0
-    },
-    {
-      type  = "c7g.2xlarge"
-      ami   = "ami-0a24e6e101933d294",
-      count = 0
-    },
-    {
-      type  = "c7a.2xlarge"
-      zone  = "us-west-2c"
-      count = 0
-    },
-    {
-      type  = "c6i.2xlarge"
-      count = 0
-    },
-    {
-      type  = "c6g.2xlarge"
-      ami   = "ami-0a24e6e101933d294",
-      count = 0
-    },
-    {
-      type  = "c6a.2xlarge"
-      count = 0
-    },
-    # Pingcap
-    {
-      type = "i3en.2xlarge"
-      count = 5
-      tags = ["pingcap"]
-      groups = ["pingcap", "i3en"]
-      spot = true
-      autoshutdown = false
-    },
-    # Kafka
-    {
-      type   = "i4i.4xlarge"
-      count  = 0
-      tags   = ["kaka"]
-      groups = ["kafka", "i3en"] 
-      autoshutdown = false
-    },
-    # Zookeeper
-    {
-      type   = "i3en.large"
-      count  = 0
-      tags   = ["kafka"]
-      groups = ["kafka", "i3en"]
-      spot   = true
-      autoshutdown = false
-    },
-    # The following are copied from aws/kafka
-    {
-      type   = "i3en.2xlarge"
-      count  = 0
-      tags   = ["kafka"]
-      groups = ["kafka", "i3en"]
-      spot   = true
-    },
-    {
-      type   = "i3en.3xlarge"
-      count  = 0
-      tags   = ["kafka"]
-      groups = ["kafka", "i3en"]
-      spot   = true
-    },
-    {
-      type  = "m5n.8xlarge"
-      count = 0
-      # spot = true
-      groups = ["kafka"]
-      tags   = ["kafka-client"]
-    },
-    # Kafka Gen 4 Vs. Gen 3  gp3
-    {
-      type = "m7i.xlarge",
-      count = 0
+      type = "m7i.2xlarge",
+      count = 2
       groups = ["kafka"]
       tags = ["kafka"]
       root_volume_type = "gp3"
       root_volume_size = "200"
       autoshutdown = false
     },
+    # one m7i.xlarge broker
+    {
+      type = "m7i.xlarge",
+      count = 1
+      groups = ["kafka"]
+      tags = ["kafka"]
+      root_volume_type = "gp3"
+      root_volume_size = "200"
+      autoshutdown = false
+    },
+    # one m6i.xlarge broker
     {
       type = "m6i.xlarge",
-      count = 0
+      count = 1
       groups = ["kafka"]
       tags = ["kafka"]
       root_volume_type = "gp3"
       root_volume_size = "200"
       autoshutdown = false
     }, 
+    # two zookeeper
     {
-      type = "m6id.xlarge",
-      count = 0
-      groups = ["kafka", "i3en"]
-      tags = ["kafka"]
-      root_volume_type = "gp3"
-      root_volume_size = "200"
-      autoshutdown = false
-    },    
-    {
-      type = "m7i.2xlarge",
-      count = 0
+      type   = "t3.small"
+      count  = 2
+      tags   = ["kafka"]
       groups = ["kafka"]
-      tags = ["kafka"]
-      root_volume_type = "gp3"
-      root_volume_size = "200"
+      spot   = true
       autoshutdown = false
     },
-    {
-      type = "m6i.large",
-      count = 0
-      groups = ["kafka"]
-      tags = ["kafka"]
-      autoshutdown = false
-    },
-    {
-      type = "m6i.2xlarge",
-      count = 0
-      groups = ["kafka"]
-      tags = ["kafka"]
-      root_volume_type = "gp3"
-      root_volume_size = "200"
-      autoshutdown = false
-    },
-
-    # Rust Lock Benchmarks
-    {
-      type = "c7i.2xlarge"
-      count = 0
-      groups = []
-      tags = ["lockbench"]
-    }
   ]
 }
 
@@ -236,8 +126,8 @@ resource "aws_instance" "agents" {
   availability_zone = each.value.zone
   ami               = each.value.ami
   instance_type     = each.value.type
-  security_groups   = [aws_security_group.systemslab_agent_sg.name]
-  key_name          = aws_key_pair.systemslab_aws_key.key_name
+  security_groups   = [var.systemslab_agent_sg]
+  key_name          = var.systemslab_agent_key
 
   instance_initiated_shutdown_behavior = each.value.spot ? null : "terminate"
 
@@ -307,7 +197,7 @@ locals {
         name  = instance.public_dns
         vars = {
           agent_config = templatefile("agent.toml.tftpl", {
-            systemslab_url = "http://${aws_instance.systemslab_server.private_ip}"
+            systemslab_url = "http://${var.systemslab_server_ip}"
             agent_name     = instance.name
             agent_tags     = flatten([[instance.public_dns], instance.tags])
           })
@@ -333,30 +223,5 @@ resource "local_file" "ansible_inventory" {
   filename        = "inventory.yaml"
   content         = yamlencode(local.inventory)
   file_permission = "0644"
-}
-
-resource "aws_security_group" "systemslab_agent_sg" {
-  name = "systemslab-agent-sg"
-  ingress {
-    description = "internal inbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["172.31.0.0/16"]
-  }
-  ingress {
-    description = "ssh"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  egress {
-    description = "outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
