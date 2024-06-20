@@ -1,0 +1,12 @@
+{
+  "matrix": {
+	  "linger_ms": ["5"],
+	  "batch_size" : ["524288"],
+    "message_size": [512],
+    "tls": ["plain"],
+    "jdk": ["jdk11"],
+    "ec2": ["m7i.xlarge"],
+    "compression": ["none"],
+    "compression_ratio": [1.0]
+  }
+}

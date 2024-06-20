@@ -12,7 +12,7 @@
   ansible.builtin.get_url:
     url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
     dest: /etc/apt/keyrings/gcp/apt-key.asc
-    checksum: sha256:aa26cfdf2640ea1e02e8959b77957491cf5fb78964f06a5921e2c79607872797
+    checksum: sha256:8a746027ede9c0a246e1b4fa27be165ffefb2e1bfdb967ce4a1d2fb868efb949
     mode: "0644"
 
 - name: Dearmor the GCP package key
@@ -89,6 +89,8 @@
     state: latest
     update_cache: true
 
-- name: Install rpc-perf
+- name: Install systemslab-nss and rpc-perf
   ansible.builtin.apt:
-    name: rpc-perf
+    name:
+      - rpc-perf
+      - systemslab-nss

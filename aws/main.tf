@@ -18,11 +18,5 @@ terraform {
 provider "aws" {
   region                   = var.aws_region
   shared_credentials_files = ["${var.aws_cred_file}"]
-  profile                  = "systemslab"
-}
-
-# This is the keypair that should be used by all the servers.
-resource "aws_key_pair" "systemslab_aws_key" {
-  key_name   = "systemslab_aws_key"
-  public_key = file("~/.aws/systemslab_aws_key.pub")
+  profile                  = "${var.aws_cred_profile}"
 }
