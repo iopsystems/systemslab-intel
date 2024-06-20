@@ -5,13 +5,28 @@
       - openjdk-11-jdk
       - openjdk-17-jdk
       - openjdk-21-jdk
-      - maven
+      - maven     
     update_cache: true
 
 - name: Using openjdk-21-jdk as the default OpenJDK
   community.general.alternatives:
     name: java
     path: /usr/lib/jvm/java-21-openjdk-amd64/bin/java
+
+- name: Copy Kafka keys to remote /opt/kafka-keys
+  copy:
+    src: ../kafka-keys/
+    dest: /opt/kafka-keys/
+    owner: root
+    group: ubuntu
+
+# - name: Copy rpc-perf to remote /opt/rpc-perf
+#   ansible.builtin.copy:
+#     src: ../rpc-perf
+#     dest: /opt/rpc-perf
+#     owner: root
+#     group: ubuntu
+#     mode: '0771'
 
 - set_fact:
     kafka_package_name: kafka_2.13-3.6.1.tgz

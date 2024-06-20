@@ -4,8 +4,8 @@ local upload_artifact = systemslab.upload_artifact;
 #local config = import '/tmp/kafka_spec.json';
 local default_config = import './default-config.jsonnet';
 
-function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio=1.0)
-  { 
+# all parameters are string
+function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512", tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio="1.0", update_dirty_ratio="true", pause="false") { 
     local jdk_path = {
       'jdk8': '/usr/lib/jvm/java-8-openjdk-amd64/jre',
       'jdk11': "/usr/lib/jvm/java-11-openjdk-amd64",
@@ -14,12 +14,14 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
     local config = default_config+{
       "linger_ms": linger_ms,
       "batch_size": batch_size,
-      "message_size": message_size,
+      "key_size": std.parseJson(key_size),
+      "message_size": std.parseJson(message_size),
       "jdk": jdk_path[jdk],
-      #"jdk": if jdk in 'jdk_path' then "/usr/lib/jvm/java-11-openjdk-amd64" else error "Unknown jdk parameter",
       "kafka_tags": ["kafka", ec2],
       "compression_type": compression,
-      "compression_ratio": compression_ratio,
+      "compression_ratio": std.parseJson(compression_ratio),
+      "update_dirty_ratio": std.parseJson(update_dirty_ratio),
+      "pause": std.parseJson(pause),
       "kafka_port": if tls == 'plain' then 9092 else 9093,
     },
     local rpc_perf_config = {
@@ -73,19 +75,20 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               topic_len: 7,
               topic_names: ["rpcperf"],
               message_len: config.message_size,
-              key_len: config.message_key,
+              key_len: config.key_size,
               compression_ratio: std.get(config, "compression_ratio", 1.0),
             },
           ],
       },
     } + if tls == 'tls' then  
-      {tls: {
+    {
+      tls: {
         ca_file: "/opt/kafka-keys/ca-cert",
         private_key: "/opt/kafka-keys/client_shared_client.key",
         private_key_password: "abcdefgh",
         certificate: "/opt/kafka-keys/client_shared_client.pem",
-      },}
-       else {},  
+      },
+    } else {},
     local kafka_config = [
       "listeners=PLAINTEXT://:9092,SSL://:9093",
       "ssl.truststore.location=/opt/kafka-keys/broker_shared_server.truststore.jks",
@@ -156,8 +159,9 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
         host: {
           tags: config.kafka_tags,
         },      
-        steps: [ 
-          bash(
+        steps: 
+          ( if config.update_dirty_ratio == true then [
+            bash(
             |||
               DIRTY_BACKGROUND_RATIO=%s
               DIRTY_EXPIRE_CENTISECS=%s
@@ -175,7 +179,9 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               echo "Set dirty_expire_centisecs to `cat /proc/sys/vm/dirty_expire_centisecs`"
               echo "Set dirty_ratio to `cat /proc/sys/vm/dirty_ratio`"
               echo "Set dirty_writeback_centisecs TO `cat /proc/sys/vm/dirty_writeback_centisecs`"
-            ||| % [config.dirty_background_ratio, config.dirty_expire_centisecs, config.dirty_ratio, config.dirty_writeback_centisecs]),                     
+            ||| % [config.dirty_background_ratio, config.dirty_expire_centisecs, config.dirty_ratio, config.dirty_writeback_centisecs]),
+          ] else [] )
+          + [
           systemslab.barrier('zookeeper-start'),          
           systemslab.write_file('server.properties', std.lines(broker_config)),
           bash(
@@ -199,7 +205,8 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
             ||| % [config.kafka_dir, config.kafka_storage, config.jdk]),          
           systemslab.barrier('kafka-start'),
           // waiting for the client to finish
-          systemslab.barrier('kafka-finish'),          
+          systemslab.barrier('kafka-finish'),
+          ] + ( if config.update_dirty_ratio == true then [        
           bash(
             |||
               sudo bash -c "echo `cat ./curr_dirty_background_ratio` > /proc/sys/vm/dirty_background_ratio"
@@ -210,7 +217,7 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               echo "Reset expire_centisecs to `cat /proc/sys/vm/dirty_expire_centisecs`"
               echo "Reset dirty_ratio to `cat /proc/sys/vm/dirty_ratio`"
               echo "ReSet dirty_writeback_centisecs TO `cat /proc/sys/vm/dirty_writeback_centisecs`"
-            |||),            
+            |||) ] else [] ) + [
           bash(
             |||
               ls -h /tmp/kafka_jvm_log
@@ -218,11 +225,11 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               sleep 3
               tar -czvf kafka_jvm_log.gz /tmp/kafka_jvm_log
             |||),
-          systemslab.upload_artifact('kafka_jvm_log.gz')
+          systemslab.upload_artifact('kafka_jvm_log.gz', tags=['jvm_log'])
           #systemslab.upload_artifact('/tmp/kafka_jvm_log'),
         ],
       },
-      rpc_perf_1: {
+      rpc_perf_1: {             
         host: {
           tags: config.client_tags,
         },
@@ -235,8 +242,18 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
             ||| % [config.kafka_port]),
           systemslab.upload_artifact('rpcperf-kafka.toml'),
           systemslab.barrier('kafka-start'),
+        ] + ( if config.pause == true then [
           bash(
             |||
+              echo 1 > ./rpcperf-pause
+              while [ `cat ./rpcperf-pause` -eq '1' ]; do              
+                sleep 10
+              done
+            |||
+          )
+        ] else [
+          bash(
+            |||            
               RPC_PERF_BINARY=%s
               STEP_DURATION=%s
               STEPS="%s"
@@ -244,6 +261,8 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               sleep 1
               for RPS in $STEPS; do
                 for RPC_SERVER in ${RPC_PERF_1_ADDR}; do
+                  curl http://$RPC_SERVER:9091/vars
+                  curl http://$RPC_SERVER:9091/metrics
                   echo "=======$RPS ${RPC_PERF_1_ADDR}======="
                   curl -s -X PUT http://$RPC_SERVER:9091/ratelimit/$RPS
                 done
@@ -251,10 +270,11 @@ function(linger_ms="5", batch_size="524288", message_size=512, tls='plain', jdk=
               done
               wait              
             ||| % [config.rpc_perf, config.step_duration, config.steps]),            
-          systemslab.upload_artifact('rpcperf.parquet', tags=['rpcperf']),       
-          systemslab.barrier('kafka-finish'),
+          systemslab.upload_artifact('rpcperf.parquet', tags=['rpcperf']),                 
           # generate the experiment spec.json
-        ],
+        ] ) + [
+          systemslab.barrier('kafka-finish'),
+        ]
       },
     },
   }

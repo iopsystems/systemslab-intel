@@ -1,6 +1,6 @@
 { 
   "name":"produce_jdk8_m7i",
-  "duration": 120,
+  "duration": 182,
   "steps": "10000 20000 30000",    
   "step_duration": 60,
   "aws_storage": "gp3",
@@ -25,8 +25,8 @@
   "exactly_once": false,
   "compression_type": "none",
   # messages
-  "message_key": 0,
-  "message_size": 2048, 
+  "key_size": 0,
+  "message_size": 512, 
   # batching
   "linger_ms": "0", 
   "batch_size": "524288",
@@ -37,7 +37,7 @@
   "kafka_storage": "/tmp/kafka",
   "zookeeper_storage": "/tmp/zookeeper",
   # JVM
-  "rpc_perf": "/opt/rpc-perf",
+  "rpc_perf": "rpc-perf",
   "kafka_version": "2.13-3.6.1",
   "kafka_dir": "/opt/kafka_2.13-3.6.1",
   "jdk": "/usr/lib/jvm/java-11-openjdk-amd64",
