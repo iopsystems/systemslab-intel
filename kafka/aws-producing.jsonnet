@@ -5,7 +5,7 @@ local upload_artifact = systemslab.upload_artifact;
 local default_config = import './default-config.jsonnet';
 
 # all parameters are string
-function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512", tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio="1.0", update_dirty_ratio="true", pause="false") { 
+function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512", tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio="1.0", update_dirty_ratio="true", controller="auto") { 
     local jdk_path = {
       'jdk8': '/usr/lib/jvm/java-8-openjdk-amd64/jre',
       'jdk11': "/usr/lib/jvm/java-11-openjdk-amd64",
@@ -21,7 +21,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
       "compression_type": compression,
       "compression_ratio": std.parseJson(compression_ratio),
       "update_dirty_ratio": std.parseJson(update_dirty_ratio),
-      "pause": std.parseJson(pause),
+      "controller": controller,
       "kafka_port": if tls == 'plain' then 9092 else 9093,
     },
     local rpc_perf_config = {
@@ -234,6 +234,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
           tags: config.client_tags,
         },
         steps: [           
+          systemslab.write_file('controller.py', importstr './controller.py'),
           systemslab.write_file('rpcperf-kafka.toml', std.manifestTomlEx(rpc_perf_config, '')),
           bash(
             |||
@@ -242,7 +243,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
             ||| % [config.kafka_port]),
           systemslab.upload_artifact('rpcperf-kafka.toml'),
           systemslab.barrier('kafka-start'),
-        ] + ( if config.pause == true then [
+        ] + ( if config.controller == 'pause' then [
           bash(
             |||
               echo 1 > ./rpcperf-pause
@@ -251,6 +252,12 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
               done
             |||
           )
+        ] else if config.controller == 'auto' then [
+          bash(
+            |||
+            |||
+          )
+
         ] else [
           bash(
             |||            

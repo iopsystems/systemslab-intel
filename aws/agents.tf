@@ -196,7 +196,7 @@ locals {
         name  = instance.public_dns
         vars = {
           agent_config = templatefile("agent.toml.tftpl", {
-            systemslab_url = "http://${var.systemslab_server_ip}"
+            systemslab_url = "http://${var.systemslab_server_ip}:3000"
             agent_name     = instance.name
             agent_tags     = flatten([[instance.public_dns], instance.tags])
           })

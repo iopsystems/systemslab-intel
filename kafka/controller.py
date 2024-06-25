@@ -94,22 +94,26 @@ def sweep(rpcperf, rezolus, start_qps, step, step_period, good_rate, retry, term
             nr_retry = 0
         else:
             # retry in current step
-            if nr_retry <= retry:
-                nr_retry += 1
-                continue
+            if nr_retry < retry:
+                nr_retry += 1                
+            else:
+                nr_retry = 0
+                nr_failure += 1
+                testing_qps += step
     return ret
 
 if __name__ == "__main__":
   parse = argparse.ArgumentParser('rpcperf kafka workload controller')
   parse.add_argument('rpcperf')
   parse.add_argument('rezolus')
-  parse.add_argument('startrate', type=float)
-  parse.add_argument('step', type=float)
+  parse.add_argument('startrate', type=int)
+  parse.add_argument('step', type=int)
   parse.add_argument('period', type=float)
   parse.add_argument('goodrate', type=float)
   parse.add_argument('retry', type=int)
   parse.add_argument('termination', type=int)  
-  args = parse.parse_args()  
+  args = parse.parse_args()
+  print(args)
   steps = sweep(args.rpcperf, args.rezolus, args.startrate, args.step, args.period, args.goodrate, args.retry, args.termination)
   with open('./steps.json', 'w') as f:
       json.dump(steps, f)

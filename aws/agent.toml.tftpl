@@ -1,6 +1,6 @@
 name       = ${jsonencode(agent_name)}
 server_url = ${jsonencode(systemslab_url)}
 tags       = ${jsonencode(agent_tags)}
-
+parquet_batch_size = 5000
 [log]
 cluster_id = "iop/aws"

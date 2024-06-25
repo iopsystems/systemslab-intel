@@ -5,7 +5,7 @@
     "message_size": [512],
     "tls": ["plain", "tls"],
     "jdk": ["jdk11"],
-    "ec2": ["m7i.xlarge"],
+    "ec2": ["m7i.xlarge", "m6i.xlarge"],
     "compression": ["none"],
     "compression_ratio": [1.0]
   }
