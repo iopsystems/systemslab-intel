@@ -1,8 +1,15 @@
 { 
   "name":"produce_jdk8_m7i",
-  "duration": 182,
-  "steps": "10000 20000 30000",    
+  "duration": 3600,
+  "controller": "auto",
+  "warmup_rate": 10000,
+  "warmup_duration": 10,
+  "start_rate": 10000,
+  "step": 10000,
   "step_duration": 60,
+  "good_rate": 0.95,
+  "retry": 1,
+  "termination": 1,  
   "aws_storage": "gp3",
   # aws instance
   "kafka_tags":["kafka", "m7i.xlarge"],

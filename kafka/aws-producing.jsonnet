@@ -255,15 +255,48 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
         ] else if config.controller == 'auto' then [
           bash(
             |||
+              # warmup first
+              RPC_PERF_BINARY=%s
+              WARMUP_RATE=%s
+              WARMUP_DURATION=%s              
+              $RPC_PERF_BINARY rpcperf-kafka.toml&
+              # give the rpcperf 1 second to get ready
+              sleep 1
+              echo "=======WARMUP ${WARMUP_RATE} ${WARMUP_DURATION} ${RPC_PERF_1_ADDR}======="
+              curl -s -X PUT http://${RPC_PERF_1_ADDR}:9091/ratelimit/${WARMUP_RATE}
+              sleep $WARMUP_DURATION
+              # terminate the warmup rpcperf
+              curl -s -X POST http://${RPC_PERF_1_ADDR}:9091/quitquitquit
+              wait
+            ||| % [config.rpc_perf, config.warmup_rate, config.warmup_duration]
+          ),
+          upload_artifact('rpcperf.parquet', 'warmup-rpcperf.parquet'),
+          bash(
             |||
-          )
-
+              RPC_PERF_BINARY=%s
+              START_RATE=%s
+              STEP=%s
+              STEP_DURATION=%s
+              GOOD_RATE=%s
+              RETRY=%s
+              TERMINATION=%s              
+              $RPC_PERF_BINARY rpcperf-kafka.toml&
+              sleep 1
+              echo "======TEST ${START_RATE} ${STEP} ${STEP_DURATION} ${GOOD_RATE} ${RETRY} ${TERMINATION} ${RPC_PERF_1_ADDR}====="
+              python3 ./controller.py ${RPC_PERF_1_ADDR}:9091 ${KAFKA_SERVER_1_ADDR}:4242 ${START_RATE} ${STEP} ${STEP_DURATION} ${GOOD_RATE} ${RETRY} ${TERMINATION}        
+              curl -s -X POST http://${RPC_PERF_1_ADDR}:9091/quitquitquit                               
+              wait
+            ||| % [config.rpc_perf, config.start_rate, config.step, config.step_duration, config.good_rate, config.retry, config.termination]
+          ),
+          systemslab.upload_artifact('rpcperf.parquet', tags=['rpcperf']),  
+          systemslab.upload_artifact('steps.json', tags=['loadstep']),
         ] else [
           bash(
             |||            
               RPC_PERF_BINARY=%s
               STEP_DURATION=%s
               STEPS="%s"
+              rm -f rpcperf.parquet
               $RPC_PERF_BINARY rpcperf-kafka.toml&
               sleep 1
               for RPS in $STEPS; do
