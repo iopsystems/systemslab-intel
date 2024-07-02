@@ -8,7 +8,7 @@ locals {
     # two m7i.2xlarge client
     {
       type = "m7i.2xlarge",
-      count = 0
+      count = 2
       groups = ["kafka"]
       tags = ["kafka", "client"]
       root_volume_type = "gp3"
@@ -18,7 +18,7 @@ locals {
     # one m7i.xlarge broker
     {
       type = "m7i.xlarge",
-      count = 0
+      count = 1
       groups = ["kafka"]
       tags = ["kafka", "broker"]
       root_volume_type = "gp3"
@@ -28,7 +28,7 @@ locals {
     # one m6i.xlarge broker
     {
       type = "m6i.xlarge",
-      count = 0
+      count = 1
       groups = ["kafka"]
       tags = ["kafka", "broker"]
       root_volume_type = "gp3"
@@ -38,7 +38,7 @@ locals {
     # two zookeeper
     {
       type   = "t3.large"
-      count  = 0
+      count  = 2
       tags   = ["kafka", "zookeeper"]
       groups = ["kafka"]    
       autoshutdown = false
@@ -196,7 +196,7 @@ locals {
         name  = instance.public_dns
         vars = {
           agent_config = templatefile("agent.toml.tftpl", {
-            systemslab_url = "http://${var.systemslab_server_ip}"
+            systemslab_url = "http://${var.systemslab_server_ip}:3000"
             agent_name     = instance.name
             agent_tags     = flatten([[instance.public_dns], instance.tags])
           })

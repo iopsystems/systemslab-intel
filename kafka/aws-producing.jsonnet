@@ -5,13 +5,25 @@ local upload_artifact = systemslab.upload_artifact;
 local default_config = import './default-config.jsonnet';
 
 # all parameters are string
-function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512", tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio="1.0", update_dirty_ratio="true", pause="false") { 
+function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512", tls='plain', jdk='jdk11', ec2='m7i.xlarge', compression="none", compression_ratio="1.0", update_dirty_ratio="true", controller="auto") { 
     local jdk_path = {
       'jdk8': '/usr/lib/jvm/java-8-openjdk-amd64/jre',
       'jdk11': "/usr/lib/jvm/java-11-openjdk-amd64",
       'jdk17': "/usr/lib/jvm/java-17-openjdk-amd64",
     },
+    local params = {
+      "tls": tls,
+      "linger_ms": std.parseJson(linger_ms),
+      "compression": compression,
+      "compression_ratio": std.parseJson(compression_ratio),
+      "jdk": jdk,
+      "ec2": ec2,
+      "message_size": std.parseJson(message_size),
+      "batch_size": std.parseJson(batch_size),
+      "key_size": std.parseJson(key_size),
+    },
     local config = default_config+{
+      "params": params,
       "linger_ms": linger_ms,
       "batch_size": batch_size,
       "key_size": std.parseJson(key_size),
@@ -21,7 +33,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
       "compression_type": compression,
       "compression_ratio": std.parseJson(compression_ratio),
       "update_dirty_ratio": std.parseJson(update_dirty_ratio),
-      "pause": std.parseJson(pause),
+      "controller": controller,
       "kafka_port": if tls == 'plain' then 9092 else 9093,
     },
     local rpc_perf_config = {
@@ -234,6 +246,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
           tags: config.client_tags,
         },
         steps: [           
+          systemslab.write_file('controller.py', importstr './controller.py'),
           systemslab.write_file('rpcperf-kafka.toml', std.manifestTomlEx(rpc_perf_config, '')),
           bash(
             |||
@@ -242,7 +255,7 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
             ||| % [config.kafka_port]),
           systemslab.upload_artifact('rpcperf-kafka.toml'),
           systemslab.barrier('kafka-start'),
-        ] + ( if config.pause == true then [
+        ] + ( if config.controller == 'pause' then [
           bash(
             |||
               echo 1 > ./rpcperf-pause
@@ -251,12 +264,51 @@ function(linger_ms="5", batch_size="524288", key_size = "8", message_size="512",
               done
             |||
           )
+        ] else if config.controller == 'auto' then [
+          bash(
+            |||
+              # warmup first
+              RPC_PERF_BINARY=%s
+              WARMUP_RATE=%s
+              WARMUP_DURATION=%s              
+              $RPC_PERF_BINARY rpcperf-kafka.toml&
+              # give the rpcperf 1 second to get ready
+              sleep 1
+              echo "=======WARMUP ${WARMUP_RATE} ${WARMUP_DURATION} ${RPC_PERF_1_ADDR}======="
+              curl -s -X PUT http://${RPC_PERF_1_ADDR}:9091/ratelimit/${WARMUP_RATE}
+              sleep $WARMUP_DURATION
+              # terminate the warmup rpcperf
+              curl -s -X POST http://${RPC_PERF_1_ADDR}:9091/quitquitquit
+              wait
+            ||| % [config.rpc_perf, config.warmup_rate, config.warmup_duration]
+          ),
+          upload_artifact('rpcperf.parquet', 'warmup-rpcperf.parquet'),
+          bash(
+            |||
+              RPC_PERF_BINARY=%s
+              START_RATE=%s
+              STEP=%s
+              STEP_DURATION=%s
+              GOOD_RATE=%s
+              RETRY=%s
+              TERMINATION=%s              
+              $RPC_PERF_BINARY rpcperf-kafka.toml&
+              sleep 1
+              echo "======TEST ${START_RATE} ${STEP} ${STEP_DURATION} ${GOOD_RATE} ${RETRY} ${TERMINATION} ${RPC_PERF_1_ADDR}====="
+              python3 ./controller.py ${RPC_PERF_1_ADDR}:9091 ${KAFKA_SERVER_1_ADDR}:4242 ${START_RATE} ${STEP} ${STEP_DURATION} ${GOOD_RATE} ${RETRY} ${TERMINATION}        
+              curl -s -X POST http://${RPC_PERF_1_ADDR}:9091/quitquitquit                               
+              wait
+            ||| % [config.rpc_perf, config.start_rate, config.step, config.step_duration, config.good_rate, config.retry, config.termination]
+          ),
+          systemslab.upload_artifact('rpcperf.parquet', tags=['rpcperf']),  
+          systemslab.upload_artifact('steps.json', tags=['loadstep']),
         ] else [
           bash(
             |||            
               RPC_PERF_BINARY=%s
               STEP_DURATION=%s
               STEPS="%s"
+              rm -f rpcperf.parquet
               $RPC_PERF_BINARY rpcperf-kafka.toml&
               sleep 1
               for RPS in $STEPS; do

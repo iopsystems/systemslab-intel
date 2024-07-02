@@ -34,7 +34,7 @@
 
 - name: Copy the GCP credentials to the host
   ansible.builtin.copy:
-    src: "~/.aws/systemslab-gcp-creds.json"
+    src: "~/.aws/systemslab-gcp-creds.json"    
     dest: /etc/apt/keyrings/gcp/credentials.json
     mode: "0600"
 

@@ -16,9 +16,11 @@ function(msg="hello world") {
             echo client: %s
             echo client: client IP address is $CLIENT_ADDR
             echo client: server IP address is $SERVER_ADDR
+            echo "hello world" > abc.txt
           ||| % [msg]
         ),      
         barrier('zookeeper-start'),
+        upload_artifact('abc.txt'),
       ],
     },
     server : {
