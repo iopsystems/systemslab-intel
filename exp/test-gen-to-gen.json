@@ -1,0 +1,1 @@
+[{"linger_ms": "0", "batch_size": "16384", "key_size": "8", "message_size": "512", "tls": "plain", "jdk": "jdk8", "ec2": "m7i.xlarge", "compression": "none", "compression_ratio": "1.0"}, {"linger_ms": "0", "batch_size": "16384", "key_size": "0", "message_size": "512", "tls": "plain", "jdk": "jdk8", "ec2": "m7i.xlarge", "compression": "none", "compression_ratio": "1.0"}]
