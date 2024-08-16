@@ -8,7 +8,7 @@ locals {
     # two m7i.2xlarge client
     {
       type = "m7i.2xlarge",
-      count = 2
+      count = 0
       groups = ["kafka"]
       tags = ["kafka", "client"]
       root_volume_type = "gp3"
@@ -18,27 +18,27 @@ locals {
     # one m7i.xlarge broker
     {
       type = "m7i.xlarge",
-      count = 1
+      count = 0
       groups = ["kafka"]
       tags = ["kafka", "broker"]
       root_volume_type = "gp3"
-      root_volume_size = "200"
+      root_volume_size = "250"
       autoshutdown = false
     },
     # one m6i.xlarge broker
     {
       type = "m6i.xlarge",
-      count = 1
+      count = 0
       groups = ["kafka"]
       tags = ["kafka", "broker"]
       root_volume_type = "gp3"
-      root_volume_size = "200"
+      root_volume_size = "250"
       autoshutdown = false
     }, 
     # two zookeeper
     {
       type   = "t3.large"
-      count  = 2
+      count  = 0
       tags   = ["kafka", "zookeeper"]
       groups = ["kafka"]    
       autoshutdown = false

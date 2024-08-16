@@ -45,7 +45,7 @@ Following these steps to setup and config the server, more documents can be foun
 * Create one c5.xlarge in the `systemslab-sg` security group with the EC2 key pair `systemslab_aws_key` attached, at least 100 GB gp3 root disk, ubuntu 22.04.
 * Add a few files to the server instance under `/home/ubuntu/.aws`:
   - `~/.aws/credentials` that has the AWS access key. Terraform needs the access key to create and terminate Systemslab agents. By default, the Terraform scripts use the `systemslab` profile which is created above.
-  - `~/.aws/systemslab_aws_key` and `~/.aws/systemslab_aws_key.pub` The `systemslab_aws_key` pair, The Ansible script use this to config the agents.
+  - `~/.aws/systemslab_aws_key` and `~/.aws/systemslab_aws_key.pub` The `systemslab_aws_key` pair, The Ansible script use this to config the agents. Please set the file permission of `~/.aws/systemslab_aws_key` to 600, otherwise ssh won't work.
   - `~/.aws/systemslab-gcp-creds.json` this is the access key to the Systemslab private repo and provided by IOP Systems.
 * SSH to the server, set up the Systemslab repo and install the server:
   - Download the public repo package  `curl -fsSL "https://storage.googleapis.com/systemslab-public/deb/systemslab-repo-$(lsb_release -sc)_latest_all.deb" -o /tmp/systemslab-repo.deb`
@@ -236,4 +236,23 @@ Sysemslab provides an efficient way of submitting multiple experiments to sweep 
 ```
 curl --request GET \
   --url http://localhost:9000/api/v1/context/CONTEXT_ID
+```
+
+## Reproducing The Experiments in Intel Gen-Over-Gen Analysis
+
+The Intel gen-over-gen analysis executes 1782 experiments that sweep 9 parameters:
+```
+tls: plain, tls
+linger_ms: 0, 5, 10
+batch_size: 16384, 524288
+compression: none, gzip, lz4, snappy, zstd
+jdk: jdk8, jdk11
+ec2: m7i.xlarge, m6i.xlarge
+message_size: 512, 1024
+key_size, 0, 8
+compression_ratio: 1.0, 4.0
+```
+The `./exp/gen-to-gen.json` lists the 1782 experiments. To submit these experiments, run:
+```
+systemslab sweep ../kafka/aws-producing.jsonnet --name intel-gen-to-gen ./gen-to-gen.json
 ```
