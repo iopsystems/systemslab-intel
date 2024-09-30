@@ -195,6 +195,8 @@ locals {
         group = "agent"
         name  = instance.public_dns
         vars = {
+          ansible_user = var.ubuntu_ssh_user
+          ansible_ssh_private_key_file: var.aws_private_key_file
           agent_config = templatefile("agent.toml.tftpl", {
             systemslab_url = "http://${var.systemslab_server_ip}:3000"
             agent_name     = instance.name
