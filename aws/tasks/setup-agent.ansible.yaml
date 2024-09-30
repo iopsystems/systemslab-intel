@@ -12,7 +12,6 @@
   ansible.builtin.get_url:
     url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
     dest: /etc/apt/keyrings/gcp/apt-key.asc
-    checksum: sha256:8a746027ede9c0a246e1b4fa27be165ffefb2e1bfdb967ce4a1d2fb868efb949
     mode: "0644"
 
 - name: Dearmor the GCP package key
@@ -24,7 +23,6 @@
   ansible.builtin.get_url:
     url: https://us-apt.pkg.dev/doc/repo-signing-key.gpg
     dest: /etc/apt/keyrings/gcp/repo-signing-key.asc
-    checksum: sha256:3ce6a27fe0538464191eebb9ff1a0b8a269af16d872524822b25198328263e84
     mode: "0644"
 
 - name: Dearmor the systemslab package key

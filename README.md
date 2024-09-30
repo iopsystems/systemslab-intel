@@ -249,7 +249,7 @@ compression: none, gzip, lz4, snappy, zstd
 jdk: jdk8, jdk11
 ec2: m7i.xlarge, m6i.xlarge
 message_size: 512, 1024
-key_size, 0, 8
+key_size: 0, 8
 compression_ratio: 1.0, 4.0
 ```
 The `./exp/gen-to-gen.json` lists the 1782 experiments. To submit these experiments, run:
